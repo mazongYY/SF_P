@@ -19,14 +19,14 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: 📦 Restore dependencies
-      run: dotnet restore
+      run: dotnet restore ReturnOrderGenerator.csproj
 
     - name: 🏗️ Build Release
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build ReturnOrderGenerator.csproj --configuration Release --no-restore
 
     - name: 🚀 Publish Windows x64
       run: |
-        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish/win-x64
+        dotnet publish ReturnOrderGenerator.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish/win-x64
 
     - name: 📦 Create release packages
       run: |
