@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore
+
+    - name: 🏗️ Build Release
+      run: dotnet build --configuration Release --no-restore
+
+    - name: 🚀 Publish Windows x64
+      run: |
+        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish/win-x64
+
+    - name: 📦 Create release packages
+      run: |
+        # 创建完整版本（包含所有文件）
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath ./ReturnOrderGenerator-${{ github.ref_name }}-win-x64-full.zip
+        
+        # 创建精简版本（仅可执行文件）
+        New-Item -ItemType Directory -Path ./publish/minimal -Force
+        Copy-Item ./publish/win-x64/ReturnOrderGenerator.exe ./publish/minimal/
+        Copy-Item ./publish/win-x64/Data ./publish/minimal/Data -Recurse -Force
+        Copy-Item ./publish/win-x64/Resources ./publish/minimal/Resources -Recurse -Force
+        Compress-Archive -Path ./publish/minimal/* -DestinationPath ./ReturnOrderGenerator-${{ github.ref_name }}-win-x64-minimal.zip
+
+    - name: 📝 Generate changelog
+      id: changelog
+      run: |
+        $tag = "${{ github.ref_name }}"
+        $changelog = @"
+        ## 🎉 Release $tag
+        
+        ### ✨ 新功能
+        - 智能地址识别和解析
+        - 随机订单数据生成
+        - 高质量图片生成
+        - 现代化 WPF 界面
+        
+        ### 🐛 Bug 修复
+        - 修复了图标显示问题
+        - 优化了内存使用
+        
+        ### 📦 下载说明
+        - **完整版** (`full.zip`): 包含所有文件和依赖
+        - **精简版** (`minimal.zip`): 仅包含必要文件，体积更小
+        
+        ### 💻 系统要求
+        - Windows 10/11 (64位)
+        - 无需安装 .NET 运行时
+        
+        ### 🚀 使用方法
+        1. 下载对应版本的 zip 文件
+        2. 解压到任意目录
+        3. 双击 `ReturnOrderGenerator.exe` 运行
+        "@
+        
+        $changelog | Out-File -FilePath changelog.md -Encoding UTF8
+        echo "changelog_file=changelog.md" >> $env:GITHUB_OUTPUT
+
+    - name: 🎉 Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ github.ref_name }}
+        body_path: ${{ steps.changelog.outputs.changelog_file }}
+        files: |
+          ReturnOrderGenerator-${{ github.ref_name }}-win-x64-full.zip
+          ReturnOrderGenerator-${{ github.ref_name }}-win-x64-minimal.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 📢 Notify release
+      run: |
+        echo "🎉 Release ${{ github.ref_name }} has been created successfully!"
+        echo "📦 Packages uploaded:"
+        echo "  - ReturnOrderGenerator-${{ github.ref_name }}-win-x64-full.zip"
+        echo "  - ReturnOrderGenerator-${{ github.ref_name }}-win-x64-minimal.zip"

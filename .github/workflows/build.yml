@@ -1,0 +1,104 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore
+
+    - name: 🏗️ Build
+      run: dotnet build --no-restore --configuration ${{ matrix.configuration }}
+
+    - name: 🧪 Test
+      run: dotnet test --no-build --verbosity normal --configuration ${{ matrix.configuration }}
+
+    - name: 📊 Upload build artifacts
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: |
+          bin/
+          obj/
+        retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore
+
+    - name: 🚀 Publish Windows x64
+      run: |
+        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish/win-x64
+
+    - name: 📦 Create release package
+      run: |
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath ./ReturnOrderGenerator-win-x64.zip
+
+    - name: 📤 Upload release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-package
+        path: ReturnOrderGenerator-win-x64.zip
+        retention-days: 30
+
+  code-quality:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore
+
+    - name: 🔍 Run code analysis
+      run: dotnet build --configuration Release --verbosity normal
+
+    - name: 📊 Generate code coverage
+      run: |
+        dotnet test --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+    - name: 📤 Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-coverage
+        path: coverage/
+        retention-days: 7
