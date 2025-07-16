@@ -1,0 +1,43 @@
+name: Test Build
+
+on:
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  test-build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: 📋 List project files
+      run: |
+        Write-Host "=== Project Files ==="
+        Get-ChildItem -Name "*.csproj"
+        Get-ChildItem -Name "*.sln"
+        Write-Host "=== Directory Structure ==="
+        Get-ChildItem -Recurse -Directory | Select-Object Name, FullName | Format-Table
+
+    - name: 📦 Restore dependencies
+      run: |
+        Write-Host "=== Restoring Dependencies ==="
+        dotnet restore ReturnOrderGenerator.csproj --verbosity detailed
+
+    - name: 🏗️ Build Debug
+      run: |
+        Write-Host "=== Building Debug Configuration ==="
+        dotnet build ReturnOrderGenerator.csproj --configuration Debug --verbosity detailed --no-restore
+
+    - name: 🏗️ Build Release
+      run: |
+        Write-Host "=== Building Release Configuration ==="
+        dotnet build ReturnOrderGenerator.csproj --configuration Release --verbosity detailed --no-restore
+
+    - name: ✅ Build Success
+      run: Write-Host "✅ All builds completed successfully!" -ForegroundColor Green
