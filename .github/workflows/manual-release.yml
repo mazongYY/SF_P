@@ -1,0 +1,134 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (例如: v1.0.2)'
+        required: true
+        default: 'v1.0.2'
+      release_type:
+        description: '发布类型'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - release
+        - prerelease
+      release_notes:
+        description: '发布说明 (可选)'
+        required: false
+        default: ''
+
+jobs:
+  manual-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore ReturnOrderGenerator.csproj
+
+    - name: 🏗️ Build Release
+      run: dotnet build ReturnOrderGenerator.csproj --configuration Release --no-restore
+
+    - name: 🚀 Publish Windows x64
+      run: |
+        dotnet publish ReturnOrderGenerator.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish/win-x64
+
+    - name: 📦 Create release packages
+      run: |
+        $version = "${{ github.event.inputs.version }}"
+        
+        # 创建完整版本（包含所有文件）
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath "./SF_P-$version-win-x64-full.zip"
+        
+        # 创建精简版本（仅可执行文件和必要资源）
+        New-Item -ItemType Directory -Path ./publish/minimal -Force
+        Copy-Item ./publish/win-x64/ReturnOrderGenerator.exe ./publish/minimal/
+        if (Test-Path ./publish/win-x64/Data) {
+            Copy-Item ./publish/win-x64/Data ./publish/minimal/Data -Recurse -Force
+        }
+        if (Test-Path ./publish/win-x64/Resources) {
+            Copy-Item ./publish/win-x64/Resources ./publish/minimal/Resources -Recurse -Force
+        }
+        Compress-Archive -Path ./publish/minimal/* -DestinationPath "./SF_P-$version-win-x64-minimal.zip"
+
+    - name: 📝 Generate changelog
+      id: changelog
+      run: |
+        $version = "${{ github.event.inputs.version }}"
+        $releaseNotes = "${{ github.event.inputs.release_notes }}"
+        $releaseType = "${{ github.event.inputs.release_type }}"
+        
+        $typeEmoji = if ($releaseType -eq "prerelease") { "🧪" } else { "🎉" }
+        $typeText = if ($releaseType -eq "prerelease") { "预发布" } else { "正式发布" }
+        
+        $changelog = @"
+        ## $typeEmoji $typeText $version
+        
+        ### 📋 发布信息
+        $(if ($releaseNotes) { "**发布说明**: $releaseNotes" } else { "**发布类型**: $typeText" })
+        
+        ### ✨ 主要功能
+        - 🔍 智能地址识别和解析
+        - 🎲 随机订单数据生成
+        - 🖼️ 高质量图片生成
+        - 🎨 现代化 WPF 界面
+        - 💾 PNG 格式图片导出
+        
+        ### 📦 下载说明
+        - **完整版** (``full.zip``): 包含所有文件和依赖，约 130MB
+        - **精简版** (``minimal.zip``): 仅包含必要文件，体积更小
+        
+        ### 💻 系统要求
+        - Windows 10/11 (64位)
+        - 无需安装 .NET 运行时
+        
+        ### 🚀 使用方法
+        1. 下载对应版本的 zip 文件
+        2. 解压到任意目录
+        3. 双击 ``ReturnOrderGenerator.exe`` 运行
+        
+        ### 📅 构建信息
+        - **构建时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
+        - **提交哈希**: ${{ github.sha }}
+        - **分支**: ${{ github.ref_name }}
+        "@
+        
+        $changelog | Out-File -FilePath changelog.md -Encoding UTF8
+        echo "changelog_file=changelog.md" >> $env:GITHUB_OUTPUT
+
+    - name: 🎉 Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: ${{ github.event.inputs.version }} - 顺丰退货订单生成器
+        body_path: ${{ steps.changelog.outputs.changelog_file }}
+        files: |
+          SF_P-${{ github.event.inputs.version }}-win-x64-full.zip
+          SF_P-${{ github.event.inputs.version }}-win-x64-minimal.zip
+        draft: false
+        prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}
+        generate_release_notes: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 📢 Notify release
+      run: |
+        $version = "${{ github.event.inputs.version }}"
+        $releaseType = "${{ github.event.inputs.release_type }}"
+        $typeText = if ($releaseType -eq "prerelease") { "预发布" } else { "正式发布" }
+        
+        echo "🎉 $typeText $version 创建成功！"
+        echo "📦 发布包:"
+        echo "  - SF_P-$version-win-x64-full.zip"
+        echo "  - SF_P-$version-win-x64-minimal.zip"
+        echo "🔗 查看发布: https://github.com/mazongYY/SF_P/releases/tag/$version"
