@@ -1,13 +1,14 @@
-name: Auto Release
+name: Auto Release (Disabled)
 
 on:
-  push:
-    branches: [ main ]
-  workflow_run:
-    workflows: ["Build and Test"]
-    types:
-      - completed
-    branches: [ main ]
+  workflow_dispatch: # 仅手动触发，禁用自动触发
+  # push:
+  #   branches: [ main ]
+  # workflow_run:
+  #   workflows: ["Build and Test"]
+  #   types:
+  #     - completed
+  #   branches: [ main ]
 
 jobs:
   auto-release:
@@ -39,28 +40,75 @@ jobs:
       id: version
       run: |
         $date = Get-Date -Format "yyyy.MM.dd"
+        $time = Get-Date -Format "HHmm"
         $shortSha = "${{ github.sha }}".Substring(0, 7)
-        $version = "v$date-$shortSha"
+        $version = "v$date-$time-$shortSha"
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "Generated version: $version"
+        
+        # 检查标签是否已存在
+        $existingTag = git tag -l $version
+        if ($existingTag) {
+            echo "Warning: Tag $version already exists"
+            $version = "$version-$(Get-Random -Maximum 999)"
+            echo "version=$version" >> $env:GITHUB_OUTPUT
+            echo "Using alternative version: $version"
+        }
 
     - name: 📦 Create release packages
       run: |
         $version = "${{ steps.version.outputs.version }}"
         
+        # 检查发布目录
+        echo "=== 检查发布目录 ==="
+        if (Test-Path ./publish/win-x64) {
+            echo "✅ 发布目录存在"
+            Get-ChildItem ./publish/win-x64 | Format-Table Name, Length
+        } else {
+            echo "❌ 发布目录不存在"
+            exit 1
+        }
+        
         # 创建完整版本（包含所有文件）
+        echo "=== 创建完整版发布包 ==="
         Compress-Archive -Path ./publish/win-x64/* -DestinationPath "./SF_P-$version-win-x64-full.zip"
+        echo "✅ 完整版发布包创建成功"
         
         # 创建精简版本（仅可执行文件和必要资源）
+        echo "=== 创建精简版发布包 ==="
         New-Item -ItemType Directory -Path ./publish/minimal -Force
-        Copy-Item ./publish/win-x64/ReturnOrderGenerator.exe ./publish/minimal/
+        
+        # 复制主程序
+        if (Test-Path ./publish/win-x64/ReturnOrderGenerator.exe) {
+            Copy-Item ./publish/win-x64/ReturnOrderGenerator.exe ./publish/minimal/
+            echo "✅ 复制主程序成功"
+        } else {
+            echo "❌ 主程序不存在"
+            exit 1
+        }
+        
+        # 复制数据文件
         if (Test-Path ./publish/win-x64/Data) {
             Copy-Item ./publish/win-x64/Data ./publish/minimal/Data -Recurse -Force
+            echo "✅ 复制数据文件成功"
+        } else {
+            echo "⚠️ 数据文件不存在，跳过"
         }
+        
+        # 复制资源文件
         if (Test-Path ./publish/win-x64/Resources) {
             Copy-Item ./publish/win-x64/Resources ./publish/minimal/Resources -Recurse -Force
+            echo "✅ 复制资源文件成功"
+        } else {
+            echo "⚠️ 资源文件不存在，跳过"
         }
+        
         Compress-Archive -Path ./publish/minimal/* -DestinationPath "./SF_P-$version-win-x64-minimal.zip"
+        echo "✅ 精简版发布包创建成功"
+        
+        # 验证发布包
+        echo "=== 验证发布包 ==="
+        Get-ChildItem *.zip | Format-Table Name, Length
 
     - name: 📝 Generate changelog
       id: changelog
@@ -95,8 +143,21 @@ jobs:
         $changelog | Out-File -FilePath changelog.md -Encoding UTF8
         echo "changelog_file=changelog.md" >> $env:GITHUB_OUTPUT
 
+    - name: 🔍 Debug release files
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        echo "=== 调试发布文件 ==="
+        echo "版本号: $version"
+        echo "当前目录文件:"
+        Get-ChildItem | Format-Table Name, Length
+        echo "查找 zip 文件:"
+        Get-ChildItem *.zip -ErrorAction SilentlyContinue | Format-Table Name, Length
+        echo "预期文件名:"
+        echo "  - SF_P-$version-win-x64-full.zip"
+        echo "  - SF_P-$version-win-x64-minimal.zip"
+
     - name: 🎉 Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.version.outputs.version }}
         name: 自动发布 ${{ steps.version.outputs.version }}
@@ -107,6 +168,7 @@ jobs:
         draft: false
         prerelease: true
         generate_release_notes: false
+        fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
