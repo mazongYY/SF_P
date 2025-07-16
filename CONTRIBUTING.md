@@ -39,8 +39,8 @@
 
 2. **克隆到本地**
    ```bash
-   git clone https://github.com/your-username/ReturnOrderGenerator.git
-   cd ReturnOrderGenerator
+   git clone https://github.com/mazongYY/SF_P.git
+   cd SF_P
    ```
 
 3. **创建功能分支**
@@ -94,8 +94,8 @@
 
 3. **克隆项目**
    ```bash
-   git clone https://github.com/your-username/ReturnOrderGenerator.git
-   cd ReturnOrderGenerator
+   git clone https://github.com/mazongYY/SF_P.git
+   cd SF_P
    ```
 
 4. **还原依赖**
@@ -264,9 +264,9 @@ git commit -m "update"
 
 如有任何问题，欢迎通过以下方式联系：
 
-- 📧 **邮箱**: [your-email@example.com](mailto:your-email@example.com)
-- 💬 **讨论**: [GitHub Discussions](https://github.com/your-username/ReturnOrderGenerator/discussions)
-- 🐛 **问题**: [GitHub Issues](https://github.com/your-username/ReturnOrderGenerator/issues)
+- 📧 **邮箱**: [mazongYY@example.com](mailto:mazongYY@example.com)
+- 💬 **讨论**: [GitHub Discussions](https://github.com/mazongYY/SF_P/discussions)
+- 🐛 **问题**: [GitHub Issues](https://github.com/mazongYY/SF_P/issues)
 
 ## 🙏 致谢
 

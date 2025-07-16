@@ -48,8 +48,8 @@
 
 ```bash
 # 克隆项目
-git clone <repository-url>
-cd ReturnOrderGenerator
+git clone https://github.com/mazongYY/SF_P.git
+cd SF_P
 
 # 还原依赖
 dotnet restore
@@ -136,7 +136,7 @@ dotnet run
 ### 📁 项目结构
 
 ```
-ReturnOrderGenerator/
+SF_P/
 ├── Models/              # 数据模型
 │   ├── RecipientInfo.cs        # 收件人信息模型
 │   ├── OrderInfo.cs            # 订单信息模型
@@ -178,8 +178,8 @@ ReturnOrderGenerator/
 
 ```bash
 # 克隆项目
-git clone <repository-url>
-cd ReturnOrderGenerator
+git clone https://github.com/mazongYY/SF_P.git
+cd SF_P
 
 # 还原依赖
 dotnet restore
@@ -222,9 +222,9 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 ## 📞 联系方式
 
-- 📧 **邮箱**：[your-email@example.com](mailto:your-email@example.com)
-- 🐛 **问题反馈**：[GitHub Issues](https://github.com/your-username/ReturnOrderGenerator/issues)
-- 💡 **功能建议**：[GitHub Discussions](https://github.com/your-username/ReturnOrderGenerator/discussions)
+- 📧 **邮箱**：[mazongYY@example.com](mailto:mazongYY@example.com)
+- 🐛 **问题反馈**：[GitHub Issues](https://github.com/mazongYY/SF_P/issues)
+- 💡 **功能建议**：[GitHub Discussions](https://github.com/mazongYY/SF_P/discussions)
 
 ---
 
@@ -232,6 +232,6 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 **⭐ 如果这个项目对你有帮助，请给个 Star 支持一下！**
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by mazongYY
 
 </div>
