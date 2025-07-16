@@ -1,17 +1,24 @@
-name: Release
+name: Auto Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main ]
+  workflow_run:
+    workflows: ["Build and Test"]
+    types:
+      - completed
+    branches: [ main ]
 
 jobs:
-  create-release:
+  auto-release:
     runs-on: windows-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
     
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
@@ -28,10 +35,21 @@ jobs:
       run: |
         dotnet publish ReturnOrderGenerator.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish/win-x64
 
+    - name: 📅 Generate version
+      id: version
+      run: |
+        $date = Get-Date -Format "yyyy.MM.dd"
+        $shortSha = "${{ github.sha }}".Substring(0, 7)
+        $version = "v$date-$shortSha"
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Generated version: $version"
+
     - name: 📦 Create release packages
       run: |
+        $version = "${{ steps.version.outputs.version }}"
+        
         # 创建完整版本（包含所有文件）
-        Compress-Archive -Path ./publish/win-x64/* -DestinationPath ./SF_P-${{ github.ref_name }}-win-x64-full.zip
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath "./SF_P-$version-win-x64-full.zip"
         
         # 创建精简版本（仅可执行文件和必要资源）
         New-Item -ItemType Directory -Path ./publish/minimal -Force
@@ -42,27 +60,21 @@ jobs:
         if (Test-Path ./publish/win-x64/Resources) {
             Copy-Item ./publish/win-x64/Resources ./publish/minimal/Resources -Recurse -Force
         }
-        Compress-Archive -Path ./publish/minimal/* -DestinationPath ./SF_P-${{ github.ref_name }}-win-x64-minimal.zip
+        Compress-Archive -Path ./publish/minimal/* -DestinationPath "./SF_P-$version-win-x64-minimal.zip"
 
     - name: 📝 Generate changelog
       id: changelog
       run: |
-        $tag = "${{ github.ref_name }}"
+        $version = "${{ steps.version.outputs.version }}"
+        $commitMsg = git log -1 --pretty=format:"%s"
         $changelog = @"
-        ## 🎉 Release $tag
+        ## 🎉 自动发布 $version
         
-        ### ✨ 新功能
-        - 智能地址识别和解析
-        - 随机订单数据生成
-        - 高质量图片生成
-        - 现代化 WPF 界面
-        
-        ### 🐛 Bug 修复
-        - 修复了图标显示问题
-        - 优化了内存使用
+        ### 📋 本次更新
+        **最新提交**: $commitMsg
         
         ### 📦 下载说明
-        - **完整版** (`full.zip`): 包含所有文件和依赖
+        - **完整版** (`full.zip`): 包含所有文件和依赖，约 130MB
         - **精简版** (`minimal.zip`): 仅包含必要文件，体积更小
         
         ### 💻 系统要求
@@ -72,7 +84,12 @@ jobs:
         ### 🚀 使用方法
         1. 下载对应版本的 zip 文件
         2. 解压到任意目录
-        3. 双击 `ReturnOrderGenerator.exe` 运行
+        3. 双击 ``ReturnOrderGenerator.exe`` 运行
+        
+        ### 📅 构建信息
+        - **构建时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
+        - **提交哈希**: ${{ github.sha }}
+        - **分支**: ${{ github.ref_name }}
         "@
         
         $changelog | Out-File -FilePath changelog.md -Encoding UTF8
@@ -81,20 +98,23 @@ jobs:
     - name: 🎉 Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        name: Release ${{ github.ref_name }}
+        tag_name: ${{ steps.version.outputs.version }}
+        name: 自动发布 ${{ steps.version.outputs.version }}
         body_path: ${{ steps.changelog.outputs.changelog_file }}
         files: |
-          SF_P-${{ github.ref_name }}-win-x64-full.zip
-          SF_P-${{ github.ref_name }}-win-x64-minimal.zip
+          SF_P-${{ steps.version.outputs.version }}-win-x64-full.zip
+          SF_P-${{ steps.version.outputs.version }}-win-x64-minimal.zip
         draft: false
-        prerelease: false
-        generate_release_notes: true
+        prerelease: true
+        generate_release_notes: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: 📢 Notify release
       run: |
-        echo "🎉 Release ${{ github.ref_name }} has been created successfully!"
-        echo "📦 Packages uploaded:"
-        echo "  - SF_P-${{ github.ref_name }}-win-x64-full.zip"
-        echo "  - SF_P-${{ github.ref_name }}-win-x64-minimal.zip"
+        $version = "${{ steps.version.outputs.version }}"
+        echo "🎉 自动发布 $version 创建成功！"
+        echo "📦 发布包:"
+        echo "  - SF_P-$version-win-x64-full.zip"
+        echo "  - SF_P-$version-win-x64-minimal.zip"
+        echo "🔗 查看发布: https://github.com/mazongYY/SF_P/releases/tag/$version"
